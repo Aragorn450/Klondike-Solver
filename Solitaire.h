@@ -57,6 +57,7 @@ public:
 	void SetDrawCount(int drawCount);
 	HashKey GameState();
 	string GetMoveInfo(Move move);
+	bool isComplete(string const& cardSet);
 	bool LoadSolitaire(string const& cardSet);
 	string GetSolitaire();
 	bool LoadPysol(string const& cardSet);

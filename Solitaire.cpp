@@ -981,6 +981,14 @@ Move Solitaire::GetMoveAvailable(int index) {
 Move Solitaire::GetMoveMade(int index) {
 	return movesMade[index];
 }
+bool Solitaire::isComplete(string const& cardSet) {
+	for (int i = 0; i < 52; i++) {
+		if (cardSet[i * 3 + 2] == 0x30) {
+			return false;
+		}
+	}
+	return true;
+}
 bool Solitaire::LoadSolitaire(string const& cardSet) {
 	int used[52] = {};
 	if (cardSet.size() < 156) { return false; }

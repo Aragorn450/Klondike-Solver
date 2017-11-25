@@ -989,6 +989,23 @@ bool Solitaire::isComplete(string const& cardSet) {
 	}
 	return true;
 }
+bool Solitaire::setCards(const int values[]) {
+	int used[52] = {};
+	for (int i = 0; i < 52; i++) {
+		int v = values[i];
+		if (v < 0 || v >= 52) {
+			return false;
+		}
+		if (used[v] == 1) {
+			return false;
+		}
+		used[1] = 1;
+	}
+	for (int i = 0; i < 52; i++) {
+		cards[i].Set(values[i]);
+	}
+	return true;
+}
 bool Solitaire::LoadSolitaire(string const& cardSet) {
 	int used[52] = {};
 	if (cardSet.size() < 156) { return false; }

@@ -58,6 +58,7 @@ public:
 	HashKey GameState();
 	string GetMoveInfo(Move move);
 	bool isComplete(string const& cardSet);
+	bool setCards(const int values[]);
 	bool LoadSolitaire(string const& cardSet);
 	string GetSolitaire();
 	bool LoadPysol(string const& cardSet);

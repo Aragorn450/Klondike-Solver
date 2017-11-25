@@ -180,7 +180,7 @@ SolveResult Solitaire::SolveRandom(int numberOfTimesToPlay, int solutionsToFind)
 
 	int solutionCount = 0;
 	while ((maxFoundationCount < 52 || solutionCount < solutionsToFind) && numberOfTimesToPlay-- > 0) {
-		while (foundationCount < 52 && movesAvailableCount > 0 && movesMadeCount < 500 && roundCount <= 10) {
+		while (foundationCount < 52 && movesAvailableCount > 0 && movesMadeCount < 500 && roundCount < maxRoundCount) {
 			int drawIndex = -1;
 			for (int i = 0; i < movesAvailableCount; i++) {
 				if (movesAvailable[i].From == WASTE) {
@@ -222,7 +222,7 @@ SolveResult Solitaire::SolveRandom(int numberOfTimesToPlay, int solutionsToFind)
 
 		//Reset game
 		node = firstNode;
-		ResetGame(drawCount);
+		ResetGame();
 		while (node != NULL) {
 			MakeMove(node->Value);
 			node = node->Parent;
@@ -231,7 +231,7 @@ SolveResult Solitaire::SolveRandom(int numberOfTimesToPlay, int solutionsToFind)
 	}
 
 	//Reset game to best solution found
-	ResetGame(drawCount);
+	ResetGame();
 	for (int i = 0; bestSolution[i].Count < 255; i++) {
 		MakeMove(bestSolution[i]);
 	}
@@ -279,7 +279,7 @@ SolveResult Solitaire::SolveFast(int maxClosedCount, int twoShift, int threeShif
 		open[index].pop();
 
 		//Initialize game to the found state
-		ResetGame(drawCount);
+		ResetGame();
 		int movesTotal = 0;
 		node = firstNode;
 		while (node != NULL) {
@@ -420,7 +420,7 @@ SolveResult Solitaire::SolveFast(int maxClosedCount, int twoShift, int threeShif
 	}
 
 	//Reset game to best solution found
-	ResetGame(drawCount);
+	ResetGame();
 	for (int i = 0; bestSolution[i].Count < 255; i++) {
 		MakeMove(bestSolution[i]);
 	}
@@ -471,7 +471,7 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 		open[index].pop();
 
 		//Initialize game to the found state
-		ResetGame(drawCount);
+		ResetGame();
 		int movesTotal = 0;
 		node = firstNode;
 		while (node != NULL) {
@@ -538,7 +538,7 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 	}
 
 	//Reset game to best solution found
-	ResetGame(drawCount);
+	ResetGame();
 	for (int i = 0; bestSolution[i].Count < 255; i++) {
 		MakeMove(bestSolution[i]);
 	}
@@ -565,6 +565,9 @@ int Solitaire::GetTalonCards(Card talon[], int talonMoves[]) {
 		if (j > 0 && j < drawCount) { j = drawCount; }
 	}
 
+	if (roundCount >= maxRoundCount - 1) {
+		return index;
+	}
 	//Check cards already turned over in the waste, meaning we have to "redeal" the deck to get to it
 	int amountToDraw = stockSize;
 	amountToDraw += stockSize;
@@ -734,10 +737,11 @@ void Solitaire::UpdateAvailableMoves() {
 	}
 }
 void Solitaire::ResetGame() {
-	ResetGame(drawCount);
+	ResetGame(drawCount, maxRoundCount);
 }
-void Solitaire::ResetGame(int drawCount) {
+void Solitaire::ResetGame(int drawCount, int maxRoundCount) {
 	this->drawCount = drawCount;
+	this->maxRoundCount = maxRoundCount;
 	roundCount = 0;
 	foundationCount = 0;
 	movesMadeCount = 0;
@@ -869,6 +873,7 @@ int Solitaire::MinimumMovesLeft() {
 }
 void Solitaire::Initialize() {
 	drawCount = 1;
+	maxRoundCount = 11;
 	for (int i = 0; i < 52; i++) {
 		cards[i].Set(i);
 	}
@@ -1080,6 +1085,9 @@ string Solitaire::GetPysol() {
 		}
 	}
 	return cardSet.str();
+}
+void Solitaire::SetMaxRoundCount(int maxRoundCount) {
+	this->maxRoundCount = maxRoundCount;
 }
 void Solitaire::SetDrawCount(int drawCount) {
 	this->drawCount = drawCount;
@@ -1323,14 +1331,14 @@ string Solitaire::MovesMade() {
 	//Returns moves made so far in the current game.
 	//DR# is a draw move that is done # number of times. ie) DR2 means draw twice, if draw count > 1 it is still DR2.
 	//NEW is to represent the moving of cards from the Waste pile back to the stock pile. A New round.
-	//F# means to flip the card on tableau pile #. 
+	//F# means to flip the card on tableau pile #.
 	//XY means to move the top card from pile X to pile Y.
 	//X will be 1 through 7, W for Waste, or a foundation suit character. 'C'lubs, 'D'iamonds, 'S'pades, 'H'earts
 	//Y will be 1 through 7 or the foundation suit character.
 	//XY-# is the same as above except you are moving # number of cards from X to Y.
 	stringstream ss;
 	int moves = movesMadeCount;
-	ResetGame(drawCount);
+	ResetGame();
 	for (int i = 0; i < moves; i++) {
 		Move m = movesMade[i];
 		AddMove(ss, m, piles[STOCK].Size(), piles[WASTE].Size(), drawCount, false);

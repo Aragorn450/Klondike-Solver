@@ -54,6 +54,12 @@ int main(int argc, char * argv[]) {
 			if (drawCount < 1 || drawCount > 12) { cout << "Please specify a valid draw count from 1 to 12."; return 0; }
 			s.SetDrawCount(drawCount);
 			i++;
+		} else if (_stricmp(argv[i], "-round") == 0 || _stricmp(argv[i], "/round") == 0 || _stricmp(argv[i], "-r") == 0 || _stricmp(argv[i], "/r") == 0) {
+				if (i + 1 >= argc) { cout << "You must specify round count."; return 0; }
+				int maxRoundCount = atoi(argv[i + 1]);
+				if (maxRoundCount < 1 || maxRoundCount > 20) { cout << "Please specify a valid max round count from 1 to 20."; return 0; }
+				s.SetMaxRoundCount(maxRoundCount);
+				i++;
 		} else if (_stricmp(argv[i], "-deck") == 0 || _stricmp(argv[i], "/deck") == 0 || _stricmp(argv[i], "-d") == 0 || _stricmp(argv[i], "/d") == 0) {
 			if (i + 1 >= argc) { cout << "You must specify deck to load."; return 0; }
 			if (commandLoaded) { cout << "Only one method can be specified (deck/game/file)."; return 0; }

@@ -25,7 +25,8 @@ private:
 	Card cards[52];
 	Move movesAvailable[32];
 	Random random;
-	int drawCount, roundCount, foundationCount, movesAvailableCount, movesMadeCount;
+	int drawCount, roundCount, maxRoundCount;
+	int foundationCount, movesAvailableCount, movesMadeCount;
 
 	int FoundationMin();
 	int GetTalonCards(Card talon[], int talonMoves[]);
@@ -34,7 +35,7 @@ public:
 	int Shuffle1(int dealNumber = -1);
 	void Shuffle2(int dealNumber);
 	void ResetGame();
-	void ResetGame(int drawCount);
+	void ResetGame(int drawCount, int maxRoundCount = 11);
 	void UpdateAvailableMoves();
 	void MakeAutoMoves();
 	void MakeMove(Move move);
@@ -52,6 +53,7 @@ public:
 	int DrawCount();
 	int MovesAdded(Move const& move);
 	int MinimumMovesLeft();
+	void SetMaxRoundCount(int maxRoundCount);
 	void SetDrawCount(int drawCount);
 	HashKey GameState();
 	string GetMoveInfo(Move move);

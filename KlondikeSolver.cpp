@@ -2,6 +2,7 @@
 #include<fstream>
 #include<ctime>
 #include<cstring>
+#include<stdlib.h>
 #include"Solitaire.h"
 #define _stricmp strcasecmp
 

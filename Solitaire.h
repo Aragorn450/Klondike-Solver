@@ -58,6 +58,7 @@ public:
 	HashKey GameState();
 	string GetMoveInfo(Move move);
 	bool isComplete(string const& cardSet);
+	bool sampleGames(string const&cardSet, int sampleCount, int values[], int dealNumber = -1);
 	bool setCards(const int values[]);
 	bool LoadSolitaire(string const& cardSet);
 	string GetSolitaire();

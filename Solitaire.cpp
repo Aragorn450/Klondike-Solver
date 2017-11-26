@@ -989,6 +989,75 @@ bool Solitaire::isComplete(string const& cardSet) {
 	}
 	return true;
 }
+void sample(Random &random, int initialValues[], int targetPositions[], int targetCount, int sampleCount, int values[]) {
+	int tempValues[52];
+	for (int i = 0; i < 52; i++) {
+		tempValues[i] = initialValues[i];
+	}
+	for (int j = 0; j < sampleCount; j++) {
+		if (targetCount > 1) {
+			for (int i = 0; i < targetCount; i++) {
+				int k = random.Next1() % (targetCount - 1);
+				int pos = targetPositions[(i + k) % targetCount];
+				int temp = tempValues[pos];
+				tempValues[pos] = tempValues[targetPositions[i]];
+				tempValues[targetPositions[i]] = temp;
+			}
+		}
+		int offset = j * 52;
+		for (int i = 0; i < 52; i++) {
+			values[offset + i] = tempValues[i];
+		}
+	}
+}
+bool Solitaire::sampleGames(string const& cardSet, int sampleCount, int values[], int dealNumber) {
+	int used[52] = {};
+	int openValues[52] = {};
+	int openCount = 0;
+
+	if (cardSet.size() < 156) { return false; }
+	for (int i = 0; i < 52; i++) {
+		int suit = (cardSet[i * 3 + 2] ^ 0x30) - 1;
+		if (suit < CLUBS || suit > HEARTS) {
+			openValues[i] = -1;
+			continue;
+		}
+		if (suit >= SPADES) {
+			suit = (suit == SPADES) ? HEARTS : SPADES;
+		}
+
+		int rank = (cardSet[i * 3] ^ 0x30) * 10 + (cardSet[i * 3 + 1] ^ 0x30);
+		if (rank < ACE || rank > KING) { return false; }
+
+		int value = suit * 13 + rank - 1;
+		if (used[value] == 1) { return false; }
+		used[value] = 1;
+		openValues[i] = value;
+		openCount++;
+	}
+
+	if (dealNumber != -1) {
+		random.SetSeed(dealNumber);
+	} else {
+		dealNumber = random.Next1();
+		random.SetSeed(dealNumber);
+	}
+	int targetPositions[52];
+	int targetCount = 0;
+	int j = 0;
+	for (int i = 0; i < 52; i++) {
+		if (openValues[i] < 0) {
+			targetPositions[targetCount++] = i;
+			while (used[j] == 1) {
+				j++;
+			}
+			openValues[i] = j;
+			j++;
+		}
+	}
+	sample(random, openValues, targetPositions, targetCount, sampleCount, values);
+	return true;
+}
 bool Solitaire::setCards(const int values[]) {
 	int used[52] = {};
 	for (int i = 0; i < 52; i++) {

@@ -1,4 +1,5 @@
 #include<iostream>
+#include<iomanip>
 #include<fstream>
 #include<ctime>
 #include<cstring>
@@ -34,6 +35,53 @@ bool LoadGame(string const& f, Solitaire & s, unsigned int & index) {
 	return true;
 }
 
+struct MoveInfo {
+	Move move;
+	int num;
+	int sum;
+};
+int solveIncompleteGame(Solitaire s, const char * deck) {
+	const int maxClosedCount = 2000;
+	const int gameCount = 100;
+	int values[gameCount * 52];
+	int moveCount = 0;
+	MoveInfo moveInfo[gameCount];
+	int i, j;
+
+	s.sampleGames(deck, gameCount, values);
+	for (i = 0; i < gameCount; i++) {
+		s.ResetGame();
+		s.SolveMinimal(maxClosedCount);
+		int foundationCount = s.FoundationCount();
+		Move firstMove = s[0];
+		for (j = 0; j < moveCount; j++) {
+			if (moveInfo[j].move == firstMove) {
+				break;
+			}
+		}
+		if (j == moveCount) {
+			moveInfo[moveCount].move = firstMove;
+			moveInfo[moveCount].num = 1;
+			moveInfo[moveCount].sum = foundationCount;
+			moveCount++;
+		}
+	}
+	float bestScore = (float)moveInfo[0].sum / moveInfo[0].num;
+	Move & bestMove = moveInfo[0].move;
+	for (i = 1; i < moveCount; i++) {
+		float score = (float)moveInfo[i].sum / moveInfo[i].num;
+		if (score > bestScore) {
+			bestScore = score;
+			bestMove = moveInfo[i].move;
+		}
+	}
+	s.ResetGame();
+	s.MakeMove(bestMove);
+	cout << s.MovesMade() << "\n";
+	cout << fixed << setprecision(2) << bestScore << "\n";
+	return 0;
+}
+
 int main(int argc, char * argv[]) {
 	Solitaire s;
 	s.Initialize();
@@ -46,6 +94,8 @@ int main(int argc, char * argv[]) {
 	string fileContents;
 	bool replay = false;
 	bool showMoves = false;
+	bool completeGame = true;
+	char * deck = NULL;
 
 	for (int i = 1; i < argc; i++) {
 		if (_stricmp(argv[i], "-draw") == 0 || _stricmp(argv[i], "/draw") == 0 || _stricmp(argv[i], "-dc") == 0 || _stricmp(argv[i], "/dc") == 0) {
@@ -63,7 +113,12 @@ int main(int argc, char * argv[]) {
 		} else if (_stricmp(argv[i], "-deck") == 0 || _stricmp(argv[i], "/deck") == 0 || _stricmp(argv[i], "-d") == 0 || _stricmp(argv[i], "/d") == 0) {
 			if (i + 1 >= argc) { cout << "You must specify deck to load."; return 0; }
 			if (commandLoaded) { cout << "Only one method can be specified (deck/game/file)."; return 0; }
-			if (!s.LoadSolitaire(argv[i + 1])) { cout << "Specified deck is invalid."; return 0; }
+			completeGame = s.isComplete(argv[i + 1]);
+			if (completeGame) {
+				if (!s.LoadSolitaire(argv[i + 1])) { cout << "Specified deck is invalid."; return 0; }
+			} else {
+				deck = argv[i + 1];
+			}
 			commandLoaded = true;
 			i++;
 		} else if (_stricmp(argv[i], "-game") == 0 || _stricmp(argv[i], "/game") == 0 || _stricmp(argv[i], "-g") == 0 || _stricmp(argv[i], "/g") == 0) {
@@ -124,6 +179,10 @@ int main(int argc, char * argv[]) {
 			file.read(&fileContents[0], fileContents.size());
 			file.close();
 		}
+	}
+
+	if (!completeGame) {
+		return solveIncompleteGame(s, deck);
 	}
 
 	if (maxClosedCount == 0) { maxClosedCount = 5000000; }

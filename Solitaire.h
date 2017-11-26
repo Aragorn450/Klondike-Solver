@@ -70,6 +70,7 @@ public:
 	string GameDiagramPysol();
 	string MovesMade();
 	string MovesAvailable();
+	string showMove(const Move& move);
 	Move operator[](int index);
 };
 

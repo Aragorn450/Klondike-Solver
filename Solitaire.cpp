@@ -431,13 +431,43 @@ SolveResult Solitaire::SolveMinimalMultithreaded(int numThreads, int maxClosedCo
 	return worker.Run(numThreads);
 }
 SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
-	MakeAutoMoves();
-	if (movesAvailableCount == 0) { return foundationCount == 52 ? SolvedMinimal : Impossible; }
+	moveValueCount = 0;
+	UpdateAvailableMoves();
+	int currentValue = ((foundationCount + 1) << 16) - movesMadeCount - 1;
+	int value;
+	while (movesAvailableCount == 1) {
+		Move move = movesAvailable[0];
+		MakeMove(move);
+		value = ((foundationCount + 1) << 16) - movesMadeCount - 1;
+		if (value > currentValue) {
+			currentValue = value;
+		}
+		UpdateAvailableMoves();
+	}
+	if (movesAvailableCount == 0) {
+		Move move = movesMade[0];
+		int i;
+		for (i = 0; i < moveValueCount; i++) {
+			if (moveValue[i].move == move) {
+				break;
+			}
+		}
+		if (i >= moveValueCount) {
+			moveValue[moveValueCount].move = move;
+			moveValue[moveValueCount].value = currentValue;
+			moveValueCount++;
+		} else if (currentValue > moveValue[i].value) {
+			moveValue[i].value = currentValue;
+		}
+
+		return currentValue == 52 ? SolvedMinimal : Impossible;
+	}
 
 	int openCount = 1;
-	int maxFoundationCount = foundationCount;
 	int bestSolutionMoveCount = 512;
 	int totalOpenCount = 1;
+	int maxFoundationCount = foundationCount;
+	int firstMoveCount = movesMadeCount;
 
 	int powerOf2 = 1;
 	while (maxClosedCount > (1 << (powerOf2 + 2))) {
@@ -450,12 +480,8 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 	bestSolution[0].Count = 255;
 	int startMoves = MinimumMovesLeft() + MovesMadeNormalizedCount();
 
-	shared_ptr<MoveNode> firstNode = movesMadeCount > 0 ? make_shared<MoveNode>(movesMade[movesMadeCount - 1]) : NULL;
+	shared_ptr<MoveNode> firstNode = NULL;
 	shared_ptr<MoveNode> node = firstNode;
-	for (int i = movesMadeCount - 2; i >= 0; i--) {
-		node->Parent = make_shared<MoveNode>(movesMade[i]);
-		node = node->Parent;
-	}
 	open[startMoves].push(firstNode);
 	while (closed.Size() < maxClosedCount) {
 		//Check for lowest score length
@@ -471,7 +497,26 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 		open[index].pop();
 
 		//Initialize game to the found state
-		ResetGame();
+		while (movesMadeCount > firstMoveCount) {
+			UndoMove();
+		}
+		Move move = movesMade[0];
+		int i;
+		for (i = 0; i < moveValueCount; i++) {
+			if (moveValue[i].move == move) {
+				break;
+			}
+		}
+		if (i >= moveValueCount) {
+			moveValue[moveValueCount].move = move;
+			moveValue[moveValueCount].value = currentValue;
+			moveValueCount++;
+		}
+		if (currentValue > moveValue[i].value) {
+			moveValue[i].value = currentValue;
+		}
+		currentValue = ((foundationCount + 1) << 16) - movesMadeCount - 1;
+
 		int movesTotal = 0;
 		node = firstNode;
 		while (node != NULL) {
@@ -481,6 +526,7 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 		while (movesTotal > 0) {
 			MakeMove(movesToMake[--movesTotal]);
 		}
+		currentValue = ((foundationCount + 1) << 16) - movesMadeCount - 1;
 
 		//Make any auto moves
 		UpdateAvailableMoves();
@@ -488,11 +534,19 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 			Move move = movesAvailable[0];
 			MakeMove(move);
 			firstNode = make_shared<MoveNode>(move, firstNode);
+			value = ((foundationCount + 1) << 16) - movesMadeCount - 1;
+			if (value > currentValue) {
+				currentValue = value;
+			}
 			UpdateAvailableMoves();
 		}
 		movesTotal = MovesMadeNormalizedCount();
 
 		//Check for best solution to foundations
+		value = ((foundationCount + 1) << 16) - movesMadeCount - 1;
+		if (value > currentValue) {
+			currentValue = value;
+		}
 		if (foundationCount > maxFoundationCount || (foundationCount == maxFoundationCount && bestSolutionMoveCount > movesTotal)) {
 			bestSolutionMoveCount = movesTotal;
 			maxFoundationCount = foundationCount;
@@ -538,7 +592,27 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 	}
 
 	//Reset game to best solution found
-	ResetGame();
+	while (movesMadeCount > 0) {
+		UndoMove();
+		if (movesMadeCount == firstMoveCount) {
+			Move move = movesMade[0];
+			int i;
+			for (i = 0; i < moveValueCount; i++) {
+				if (moveValue[i].move == move) {
+					break;
+				}
+			}
+			if (i >= moveValueCount) {
+				moveValue[i].move = move;
+				moveValue[i].value = 0;
+				moveValueCount++;
+			}
+			if (currentValue > moveValue[i].value) {
+				moveValue[i].value = currentValue;
+			}
+			currentValue = ((foundationCount + 1) << 16) - movesMadeCount - 1;
+		}
+	}
 	for (int i = 0; bestSolution[i].Count < 255; i++) {
 		MakeMove(bestSolution[i]);
 	}
@@ -600,6 +674,129 @@ void Solitaire::UpdateAvailableMoves() {
 	Card talon[24];
 	int talonMoves[24];
 	int talonCount = GetTalonCards(talon, talonMoves);
+	Move lastMove;
+	if (movesMadeCount > 0) {
+		lastMove = movesMade[movesMadeCount - 1];
+	} else {
+		lastMove = Move(255, 255, 0, 0);
+	}
+
+	if (lastMove.From >= FOUNDATION1C && lastMove.From <= FOUNDATION4H) {
+		//Check tableau to tableau of last move
+		for (int i = TABLEAU1; i <= TABLEAU7; ++i) {
+			Pile & pile1 = piles[i];
+			int pile1Size = pile1.Size();
+
+			if (pile1Size == 0) { continue; }
+
+			int j = lastMove.To;
+			if (i == j) { continue; }
+
+			int pile1UpSize = pile1.UpSize();
+			Card card1 = pile1.Low();
+			Card card2 = pile1.High();
+			int pile1Length = card2.Rank - card1.Rank + 1;
+			bool kingMoved = false;
+
+			Pile & pile2 = piles[j];
+
+			if (pile2.Size() == 0) {
+				continue;
+			}
+
+			Card card3 = pile2.Low();
+			//logic used to determine if a pile of cards can be moved ontop of another pile of cards
+			if (card1.Rank >= card3.Rank || card2.Rank + 1 < card3.Rank || ((card3.IsRed ^ card1.IsRed) ^ (card3.IsOdd ^ card1.IsOdd)) != 0) {
+				continue;
+			}
+
+			int pile1Moved = card3.Rank - card1.Rank;
+
+			if (pile1Moved == pile1Length) {//we are moving all face up cards
+				movesAvailable[movesAvailableCount++].Set(i, j, pile1Moved, pile1Size > pile1Moved ? 1 : 0);
+				continue;
+			}
+
+			//look to see if we are covering a card that can be moved to the foundation
+			Card card4 = pile1[pile1UpSize - pile1Moved - 1];
+			if (card4.Rank - piles[card4.Foundation].Size() == 1) {
+				movesAvailable[movesAvailableCount++].Set(i, j, pile1Moved, 0);
+			}
+		}
+
+		//Check talon cards
+		for (int j = 0; j < talonCount; j++) {
+			Card talonCard = talon[j];
+			int foundation = talonCard.Foundation;
+			int cardsToDraw = talonMoves[j];
+
+			if (talonCard.Rank - piles[foundation].Size() == 1) {
+				if (talonCard.Rank <= foundationMin + 1) {
+					if (drawCount == 1) {
+						if (cardsToDraw == 0 || movesAvailableCount == 0) {
+							movesAvailable[0].Set(WASTE, foundation, 1, cardsToDraw);
+							movesAvailableCount = 1;
+							return;
+						} else {
+							movesAvailable[movesAvailableCount++].Set(WASTE, foundation, 1, cardsToDraw);
+							break;
+						}
+					} else {
+						movesAvailable[movesAvailableCount++].Set(WASTE, foundation, 1, cardsToDraw);
+						continue;
+					}
+				}
+
+				movesAvailable[movesAvailableCount++].Set(WASTE, foundation, 1, cardsToDraw);
+			}
+
+			int i = lastMove.To;
+			Pile & pile = piles[i];
+
+			if (pile.Size() != 0) {
+				Card tableauCard = pile.Low();
+
+				if (tableauCard.Rank - talonCard.Rank != 1 || tableauCard.IsRed == talonCard.IsRed) {
+					continue;
+				}
+
+				movesAvailable[movesAvailableCount++].Set(WASTE, i, 1, cardsToDraw);
+			} else if (talonCard.Rank == KING) {
+				movesAvailable[movesAvailableCount++].Set(WASTE, i, 1, cardsToDraw);
+				break;
+			}
+		}
+
+		if (foundationCount == 0) { return; }
+		//Check foundation to tableau, very rarely needed to solve optimally
+		for (int i = FOUNDATION1C; i <= FOUNDATION4H; ++i) {
+			Pile & pile1 = piles[i];
+			int foundationRank = pile1.Size();
+			if (foundationRank == 0 || foundationRank <= foundationMin) { continue; }
+
+			for (int j = TABLEAU1; j <= TABLEAU7; ++j) {
+				Pile & pile2 = piles[j];
+
+				if (pile2.Size() != 0) {
+					Card card = pile2.Low();
+
+					if ((card.Foundation & 1) == (i & 1) || card.Rank - foundationRank != 1) {
+						continue;
+					}
+
+					if (lastMove.From != j && lastMove.To != i) {
+						movesAvailable[movesAvailableCount++].Set(i, j, 1, 0);
+					}
+				} else if (foundationRank == KING) {
+					if (lastMove.From != j && lastMove.To != i) {
+						movesAvailable[movesAvailableCount++].Set(i, j, 1, 0);
+					}
+					break;
+				}
+			}
+		}
+		return;
+	}
 
 	//Check tableau to foundation, Check tableau to tableau
 	for (int i = TABLEAU1; i <= TABLEAU7; ++i) {
@@ -614,13 +811,15 @@ void Solitaire::UpdateAvailableMoves() {
 
 		if (card1.Rank - piles[cardFoundation].Size() == 1) {
 			//logic used to tell if we can safely move a card to its foundation
-			if (card1.Rank < foundationMin) {
+			if (card1.Rank <= foundationMin + 1) {
 				movesAvailable[0].Set(i, cardFoundation, 1, pile1UpSize == 1 && pile1Size > 1 ? 1 : 0);
 				movesAvailableCount = 1;
 				return;
 			}
 
-			movesAvailable[movesAvailableCount++].Set(i, cardFoundation, 1, pile1UpSize == 1 && pile1Size > 1 ? 1 : 0);
+			if (lastMove.From != cardFoundation && lastMove.To != i) {
+				movesAvailable[movesAvailableCount++].Set(i, cardFoundation, 1, pile1UpSize == 1 && pile1Size > 1 ? 1 : 0);
+			}
 		}
 
 		Card card2 = pile1.High();
@@ -669,7 +868,7 @@ void Solitaire::UpdateAvailableMoves() {
 		int cardsToDraw = talonMoves[j];
 
 		if (talonCard.Rank - piles[foundation].Size() == 1) {
-			if (talonCard.Rank <= foundationMin) {
+			if (talonCard.Rank <= foundationMin + 1) {
 				if (drawCount == 1) {
 					if (cardsToDraw == 0 || movesAvailableCount == 0) {
 						movesAvailable[0].Set(WASTE, foundation, 1, cardsToDraw);
@@ -708,11 +907,10 @@ void Solitaire::UpdateAvailableMoves() {
 
 	if (foundationCount == 0) { return; }
 	//Check foundation to tableau, very rarely needed to solve optimally
-	Move lastMove = movesMade[movesMadeCount - 1];
 	for (int i = FOUNDATION1C; i <= FOUNDATION4H; ++i) {
 		Pile & pile1 = piles[i];
 		int foundationRank = pile1.Size();
-		if (foundationRank == 0 || foundationRank <= foundationMin) { continue; }
+		if (foundationRank == 0 || foundationRank <= foundationMin + 1) { continue; }
 
 		for (int j = TABLEAU1; j <= TABLEAU7; ++j) {
 			Pile & pile2 = piles[j];
@@ -873,7 +1071,7 @@ int Solitaire::MinimumMovesLeft() {
 }
 void Solitaire::Initialize() {
 	drawCount = 1;
-	maxRoundCount = 11;
+	maxRoundCount = 24;
 	for (int i = 0; i < 52; i++) {
 		cards[i].Set(i);
 	}
@@ -973,21 +1171,13 @@ int Solitaire::FoundationMin() {
 	one = piles[FOUNDATION1C].Size();
 	two = piles[FOUNDATION3S].Size();
 	int blackFoundationMin = one <= two ? one : two;
-	return 2 + (blackFoundationMin <= redFoundationMin ? blackFoundationMin : redFoundationMin);
+	return blackFoundationMin <= redFoundationMin ? blackFoundationMin : redFoundationMin;
 }
 Move Solitaire::GetMoveAvailable(int index) {
 	return movesAvailable[index];
 }
 Move Solitaire::GetMoveMade(int index) {
 	return movesMade[index];
-}
-bool Solitaire::isComplete(string const& cardSet) {
-	for (int i = 0; i < 52; i++) {
-		if (cardSet[i * 3 + 2] == 0x30) {
-			return false;
-		}
-	}
-	return true;
 }
 void sample(Random &random, int initialValues[], int targetPositions[], int targetCount, int sampleCount, int values[]) {
 	int tempValues[52];
@@ -1010,31 +1200,12 @@ void sample(Random &random, int initialValues[], int targetPositions[], int targ
 		}
 	}
 }
-bool Solitaire::sampleGames(string const& cardSet, int sampleCount, int values[], int dealNumber) {
+bool Solitaire::sampleGames(const int initialValues[], int sampleCount, int values[], int dealNumber) {
+	int openValues[52];
+	int targetPositions[52];
+	int targetCount = 0;
+	int j;
 	int used[52] = {};
-	int openValues[52] = {};
-	int openCount = 0;
-
-	if (cardSet.size() < 156) { return false; }
-	for (int i = 0; i < 52; i++) {
-		int suit = (cardSet[i * 3 + 2] ^ 0x30) - 1;
-		if (suit < CLUBS || suit > HEARTS) {
-			openValues[i] = -1;
-			continue;
-		}
-		if (suit >= SPADES) {
-			suit = (suit == SPADES) ? HEARTS : SPADES;
-		}
-
-		int rank = (cardSet[i * 3] ^ 0x30) * 10 + (cardSet[i * 3 + 1] ^ 0x30);
-		if (rank < ACE || rank > KING) { return false; }
-
-		int value = suit * 13 + rank - 1;
-		if (used[value] == 1) { return false; }
-		used[value] = 1;
-		openValues[i] = value;
-		openCount++;
-	}
 
 	if (dealNumber != -1) {
 		random.SetSeed(dealNumber);
@@ -1042,9 +1213,13 @@ bool Solitaire::sampleGames(string const& cardSet, int sampleCount, int values[]
 		dealNumber = random.Next1();
 		random.SetSeed(dealNumber);
 	}
-	int targetPositions[52];
-	int targetCount = 0;
-	int j = 0;
+	for (int i = 0; i < 52; i++) {
+		openValues[i] = initialValues[i];
+		if (openValues[i] >= 0) {
+			used[openValues[i]] = 1;
+		}
+	}
+	j = 0;
 	for (int i = 0; i < 52; i++) {
 		if (openValues[i] < 0) {
 			targetPositions[targetCount++] = i;
@@ -1058,7 +1233,7 @@ bool Solitaire::sampleGames(string const& cardSet, int sampleCount, int values[]
 	sample(random, openValues, targetPositions, targetCount, sampleCount, values);
 	return true;
 }
-bool Solitaire::setCards(const int values[]) {
+bool Solitaire::setCards(const int values[], const int sizes[]) {
 	int used[52] = {};
 	for (int i = 0; i < 52; i++) {
 		int v = values[i];
@@ -1068,10 +1243,43 @@ bool Solitaire::setCards(const int values[]) {
 		if (used[v] == 1) {
 			return false;
 		}
-		used[1] = 1;
+		used[v] = 1;
 	}
 	for (int i = 0; i < 52; i++) {
 		cards[i].Set(values[i]);
+	}
+	for (int i = 0; i < 13; ++i) {
+		piles[i].Reset();
+	}
+
+	int i = 0;
+	int n = 0;
+	int size = 0;
+	for (int j = TABLEAU1; j <= TABLEAU7; j++) {
+		size = sizes[i++];
+		for (int k = 0; k < size; k++) {
+			piles[j].AddDown(cards[n++]);
+		}
+		size = sizes[i++];
+		for (int k = 0; k < size; k++) {
+			piles[j].AddUp(cards[n++]);
+		}
+	}
+	size = sizes[i++];
+	for (int k = 0; k < size; k++) {
+		piles[STOCK].AddUp(cards[n++]);
+	}
+	size = sizes[i++];
+	for (int k = 0; k < size; k++) {
+		piles[WASTE].AddUp(cards[n++]);
+	}
+	foundationCount = 0;
+	for (int j = FOUNDATION1C; j <= FOUNDATION4H; j++) {
+		size = sizes[i++];
+		for (int k = 0; k < size; k++) {
+			piles[j].AddUp(cards[n++]);
+		}
+		foundationCount += size;
 	}
 	return true;
 }
@@ -1432,7 +1640,9 @@ string Solitaire::MovesMade() {
 	//XY-# is the same as above except you are moving # number of cards from X to Y.
 	stringstream ss;
 	int moves = movesMadeCount;
-	ResetGame();
+	while (movesMadeCount > 0) {
+		UndoMove();
+	}
 	for (int i = 0; i < moves; i++) {
 		Move m = movesMade[i];
 		AddMove(ss, m, piles[STOCK].Size(), piles[WASTE].Size(), drawCount, false);
@@ -1517,4 +1727,10 @@ int Solitaire::MovesAdded(Move const& move) {
 }
 Move Solitaire::operator[](int index) {
 	return movesMade[index];
+}
+int Solitaire::MoveValueCount() {
+	return moveValueCount;
+}
+MoveValue Solitaire::GetMoveValue(int i) {
+	return moveValue[i];
 }

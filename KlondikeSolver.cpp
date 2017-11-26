@@ -5,7 +5,9 @@
 #include<cstring>
 #include<stdlib.h>
 #include"Solitaire.h"
+#ifndef _WIN32
 #define _stricmp strcasecmp
+#endif
 
 using namespace std;
 
@@ -39,46 +41,163 @@ struct MoveInfo {
 	Move move;
 	int num;
 	int sum;
+	int countSum;
 };
-int solveIncompleteGame(Solitaire s, const char * deck) {
-	const int maxClosedCount = 2000;
-	const int gameCount = 100;
-	int values[gameCount * 52];
-	int moveCount = 0;
-	MoveInfo moveInfo[gameCount];
-	int i, j;
+bool parseCards(string const& cardSet, int values[], int sizes[]) {
+	int used[52] = {};
+	int j = 0;
+	int p = 0;
 
-	s.sampleGames(deck, gameCount, values);
+	if (cardSet.size() < 52 * 3 + 19) {
+		return false;
+	}
+	for (int i = 0; i < 20; i++) {
+		sizes[i] = 0;
+	}
+	for (int i = 0; i < 52; i++) {
+		while (cardSet[p] < 0x30 || cardSet[p] >= 0x3a) {
+			j++;
+			p++;
+		}
+		int suit = (cardSet[p + 2] ^ 0x30) - 1;
+		if (suit >= CLUBS && suit <= HEARTS) {
+			if (suit >= SPADES) {
+				suit = (suit == SPADES) ? HEARTS : SPADES;
+			}
+			int rank = (cardSet[p] ^ 0x30) * 10 + (cardSet[p + 1] ^ 0x30);
+			if (rank < ACE || rank > KING) {
+				return false;
+			}
+			int value = suit * 13 + rank - 1;
+			if (used[value] == 1) {
+				return false;
+			}
+			used[value] = 1;
+			values[i] = value;
+		} else {
+			values[i] = -1;
+		}
+		sizes[j]++;
+		p += 3;
+	}
+	int temp[13];
+	int size = sizes[19];
+	for (int i = 0; i < size; i++) {
+		temp[i] = values[i + 52 - size];
+	}
+	int size2 = sizes[18];
+	for (int i = 0; i < size2; i++) {
+		values[51 - i] = values[51 - size - i];
+	}
+	for (int i = 0; i < size; i++) {
+		values[52 - size - size2 + i] = temp[i];
+	}
+	sizes[18] = size;
+	sizes[19] = size2;
+	return true;
+}
+int solveIncompleteGame(Solitaire s, const char * cards, int seed) {
+	int maxClosedCount = 4000;
+	const int maxClosedCountForComplete = 100000;
+	const int maxGameCount = 50;
+	int gameCount = 0;
+	int initialValues[52];
+	int sizes[20];
+	int values[maxGameCount * 52];
+	int moveCount;
+	MoveInfo moveInfo[200];
+	int i, j, k;
+	bool complete;
+
+	if (!parseCards(cards, initialValues, sizes)) {
+		cout << "Specified card sequence is invalid.\n" << endl;
+		return 0;
+	}
+	complete = true;
+	for (i = 0; i < 52; i++) {
+		if (initialValues[i] < 0) {
+			complete = false;
+			break;
+		}
+	}
+	if (complete) {
+		gameCount = 1;
+		maxClosedCount = maxClosedCountForComplete;
+		for (i = 0; i < 52; i++) {
+			values[i] = initialValues[i];
+		}
+	} else {
+		gameCount = maxGameCount;
+		s.sampleGames(initialValues, gameCount, values, seed);
+	}
+	moveCount = 1;
 	for (i = 0; i < gameCount; i++) {
 		s.ResetGame();
+		s.setCards(&values[i * 52], sizes);
 		s.SolveMinimal(maxClosedCount);
-		int foundationCount = s.FoundationCount();
-		Move firstMove = s[0];
-		for (j = 0; j < moveCount; j++) {
-			if (moveInfo[j].move == firstMove) {
-				break;
+		int moveValueCount = s.MoveValueCount();
+		MoveValue maxMoveValue;
+		maxMoveValue.value = -1;
+		for (j = 0; j < moveValueCount; j++) {
+			MoveValue moveValue = s.GetMoveValue(j);
+			if (moveValue.move.From == WASTE && moveValue.move.Extra > 0) {
+				if (moveValue.value > maxMoveValue.value) {
+					maxMoveValue = moveValue;
+				}
 			}
 		}
-		if (j == moveCount) {
-			moveInfo[moveCount].move = firstMove;
-			moveInfo[moveCount].num = 1;
-			moveInfo[moveCount].sum = foundationCount;
-			moveCount++;
+		if (maxMoveValue.value >= 0) {
+			moveInfo[0].move = maxMoveValue.move;
+			moveInfo[0].num++;
+			moveInfo[0].sum += maxMoveValue.value >> 16;
+			moveInfo[0].countSum += (1 << 16) - (maxMoveValue.value &0xffff);
+		}
+		for (j = 0; j < moveValueCount; j++) {
+			MoveValue moveValue = s.GetMoveValue(j);
+			if (moveValue.move.From == WASTE && moveValue.move.Extra > 0) {
+				continue;
+			}
+			for (k = 0; k < moveCount; k++) {
+				if (moveInfo[k].move == moveValue.move) {
+					break;
+				}
+			}
+			if (k >= moveCount) {
+				moveInfo[k].move = moveValue.move;
+				moveInfo[k].num = 0;
+				moveInfo[k].sum = 0;
+				moveInfo[k].countSum = 0;
+				moveCount++;
+			}
+			moveInfo[k].num++;
+			moveInfo[k].sum += moveValue.value >> 16;
+			moveInfo[k].countSum += (1 << 16) - (moveValue.value &0xffff);
 		}
 	}
-	float bestScore = (float)moveInfo[0].sum / moveInfo[0].num;
-	Move & bestMove = moveInfo[0].move;
-	for (i = 1; i < moveCount; i++) {
-		float score = (float)moveInfo[i].sum / moveInfo[i].num;
-		if (score > bestScore) {
-			bestScore = score;
-			bestMove = moveInfo[i].move;
+	float bestScore = -1.0;
+	float bestCount = 10000.0;
+	int best = -1;
+	if (moveCount > 0) {
+		for (i = 0; i < moveCount; i++) {
+			float score = (float)moveInfo[i].sum / moveInfo[i].num;
+			float count = (float)moveInfo[i].countSum / moveInfo[i].num;
+			if (score > bestScore || (score == bestScore && count < bestCount)) {
+				bestScore = score;
+				bestCount = count;
+				best = i;
+			}
 		}
 	}
-	s.ResetGame();
-	s.MakeMove(bestMove);
-	cout << s.MovesMade() << "\n";
-	cout << fixed << setprecision(2) << bestScore << "\n";
+	if (best >= 0) {
+		s.ResetGame();
+		s.setCards(&values[0], sizes);
+		s.MakeMove(moveInfo[best].move);
+		cout << s.MovesMade() << endl;
+		cout << fixed << setprecision(2) << bestScore << endl;
+	} else {
+		cout << "NONE" << endl;
+		cout << "0.0" << endl;
+	}
 	return 0;
 }
 
@@ -95,7 +214,8 @@ int main(int argc, char * argv[]) {
 	bool replay = false;
 	bool showMoves = false;
 	bool completeGame = true;
-	char * deck = NULL;
+	char * cards = NULL;
+	int seed;
 
 	for (int i = 1; i < argc; i++) {
 		if (_stricmp(argv[i], "-draw") == 0 || _stricmp(argv[i], "/draw") == 0 || _stricmp(argv[i], "-dc") == 0 || _stricmp(argv[i], "/dc") == 0) {
@@ -107,23 +227,25 @@ int main(int argc, char * argv[]) {
 		} else if (_stricmp(argv[i], "-round") == 0 || _stricmp(argv[i], "/round") == 0 || _stricmp(argv[i], "-r") == 0 || _stricmp(argv[i], "/r") == 0) {
 				if (i + 1 >= argc) { cout << "You must specify round count."; return 0; }
 				int maxRoundCount = atoi(argv[i + 1]);
-				if (maxRoundCount < 1 || maxRoundCount > 20) { cout << "Please specify a valid max round count from 1 to 20."; return 0; }
+				if (maxRoundCount < 1 || maxRoundCount > 24) { cout << "Please specify a valid max round count from 1 to 24."; return 0; }
 				s.SetMaxRoundCount(maxRoundCount);
 				i++;
 		} else if (_stricmp(argv[i], "-deck") == 0 || _stricmp(argv[i], "/deck") == 0 || _stricmp(argv[i], "-d") == 0 || _stricmp(argv[i], "/d") == 0) {
 			if (i + 1 >= argc) { cout << "You must specify deck to load."; return 0; }
-			if (commandLoaded) { cout << "Only one method can be specified (deck/game/file)."; return 0; }
-			completeGame = s.isComplete(argv[i + 1]);
-			if (completeGame) {
-				if (!s.LoadSolitaire(argv[i + 1])) { cout << "Specified deck is invalid."; return 0; }
-			} else {
-				deck = argv[i + 1];
-			}
+			if (commandLoaded) { cout << "Only one method can be specified (deck/game/file/card)."; return 0; }
+			if (!s.LoadSolitaire(argv[i + 1])) { cout << "Specified deck is invalid."; return 0; }
+			commandLoaded = true;
+			i++;
+		} else if (_stricmp(argv[i], "-card") == 0 || _stricmp(argv[i], "/card") == 0 || _stricmp(argv[i], "-c") == 0 || _stricmp(argv[i], "/c") == 0) {
+			if (i + 1 >= argc) { cout << "You must specify cards to load."; return 0; }
+			if (commandLoaded) { cout << "Only one method can be specified (deck/game/file/card)."; return 0; }
+			completeGame = false;
+			cards = argv[i + 1];
 			commandLoaded = true;
 			i++;
 		} else if (_stricmp(argv[i], "-game") == 0 || _stricmp(argv[i], "/game") == 0 || _stricmp(argv[i], "-g") == 0 || _stricmp(argv[i], "/g") == 0) {
 			if (i + 1 >= argc) { cout << "You must specify a game number to load. Any integeral number."; return 0; }
-			if (commandLoaded) { cout << "Only one method can be specified (deck/game/file)."; return 0; }
+			if (commandLoaded) { cout << "Only one method can be specified (deck/game/file/card)."; return 0; }
 			commandLoaded = true;
 			s.Shuffle1(atoi(argv[i + 1]));
 			i++;
@@ -149,6 +271,9 @@ int main(int argc, char * argv[]) {
 			showMoves = true;
 		} else if (_stricmp(argv[i], "-r") == 0 || _stricmp(argv[i], "/r") == 0) {
 			replay = true;
+		} else if (_stricmp(argv[i], "-seed") == 0 || _stricmp(argv[i], "/seed") == 0) {
+			seed = atoi(argv[i + 1]);
+			i++;
 		} else if (_stricmp(argv[i], "-?") == 0 || _stricmp(argv[i], "/?") == 0 || _stricmp(argv[i], "?") == 0 || _stricmp(argv[i], "/help") == 0 || _stricmp(argv[i], "-help") == 0) {
 			cout << "Klondike Solver V2.0\nSolves games of Klondike (Patience) solitaire minimally or a faster best try.\n\n";
 			cout << "KlondikeSolver [/DC] [/D] [/G] [/O] [/M] [/S] [/F] [/R] [/MVS] [Path]\n\n";
@@ -165,11 +290,13 @@ int main(int argc, char * argv[]) {
 			cout << "                        solution is found.";
 			cout << "  /STATES # [/S #]      Sets the maximum number of game states to evaluate\n";
 			cout << "                        before terminating. Defaults to 5,000,000.\n\n";
+			cout << "  /ROUND # [/R #]       Sets the maximum number of round.\n";
+			cout << "                        Defaults to 24.\n\n";
 			cout << "  /FAST [/F]            Run the solver in a best attempt mode, which is\n";
 			cout << "                        faster, but not guaranteed to give minimal solution.\n";
 			return 0;
 		} else {
-			if (commandLoaded) { cout << "Only one method can be specified (deck/game/file)."; return 0; }
+			if (commandLoaded) { cout << "Only one method can be specified (deck/game/file/card)."; return 0; }
 			commandLoaded = true;
 			ifstream file(argv[i], ios::in | ios::binary);
 			if (!file) { cout << "You must specify a valid and accessible file."; return 0; }
@@ -182,7 +309,7 @@ int main(int argc, char * argv[]) {
 	}
 
 	if (!completeGame) {
-		return solveIncompleteGame(s, deck);
+		return solveIncompleteGame(s, cards, seed);
 	}
 
 	if (maxClosedCount == 0) { maxClosedCount = 5000000; }

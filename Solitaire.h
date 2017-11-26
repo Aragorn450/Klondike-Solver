@@ -18,12 +18,19 @@ enum SolveResult {
 	SolvedMinimal = 1
 };
 
+struct MoveValue {
+	Move move;
+	int value;
+};
+
 class Solitaire {
 private:
 	Move movesMade[512];
 	Pile piles[13];
 	Card cards[52];
 	Move movesAvailable[32];
+	MoveValue moveValue[100];
+	int moveValueCount;
 	Random random;
 	int drawCount, roundCount, maxRoundCount;
 	int foundationCount, movesAvailableCount, movesMadeCount;
@@ -57,9 +64,8 @@ public:
 	void SetDrawCount(int drawCount);
 	HashKey GameState();
 	string GetMoveInfo(Move move);
-	bool isComplete(string const& cardSet);
-	bool sampleGames(string const&cardSet, int sampleCount, int values[], int dealNumber = -1);
-	bool setCards(const int values[]);
+	bool sampleGames(const int initialValues[], int sampleCount, int values[], int dealNumber = -1);
+	bool setCards(const int values[], const int sizes[]);
 	bool LoadSolitaire(string const& cardSet);
 	string GetSolitaire();
 	bool LoadPysol(string const& cardSet);
@@ -70,8 +76,9 @@ public:
 	string GameDiagramPysol();
 	string MovesMade();
 	string MovesAvailable();
-	string showMove(const Move& move);
 	Move operator[](int index);
+	int MoveValueCount();
+	MoveValue GetMoveValue(int i);
 };
 
 class SolitaireWorker {

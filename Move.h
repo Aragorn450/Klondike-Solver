@@ -9,6 +9,7 @@ struct Move {
 	Move();
 	Move(unsigned char from, unsigned char to, unsigned char count, unsigned char extra);
 	void Set(unsigned char from, unsigned char to, unsigned char count, unsigned char extra);
+	bool operator==(const Move& move);
 };
 
 struct MoveNode {

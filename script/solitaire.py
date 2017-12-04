@@ -68,12 +68,12 @@ class Solitaire(object):
         self._window_y = y
         self._output_path = output_path
         self._scores = []
+        ag.PAUSE = 0
 
     def reset_game(self, reason=None):
-        screen = self._screenshot()
         # retry to restart game when
         if reason is not None:
-            card = self._detect_tableau_card(screen, 0)
+            card = self._detect_tableau_card(0)
             while card[0] is None:
                 if reason == 'clear':
                     self._click(self._new_game_after_clear_x, self._new_game_after_clear_y)
@@ -82,24 +82,24 @@ class Solitaire(object):
                 else: # 'no_move'
                     if self.has_no_move():
                         self._click(self._no_move_x, self._no_move_y)
-                        time.sleep(2)
+                        time.sleep(1)
                     self._click(self._new_game_x, self._new_game_y)
                 time.sleep(3)
-                screen = self._screenshot()
+                card = self._detect_tableau_card(0)
 
         self._stock = [(None, None) for i in six.moves.range(24)]
-        if self._waste_is_empty(screen):
+        if self._waste_is_empty():
             self._waste = []
             self.draw()
         else:
-            self._waste = self._detect_waste_cards(screen)
+            self._waste = self._detect_waste_cards()
         self._tableau_down = []
         for i in six.moves.range(7):
             cards = [(None, None) for j in six.moves.range(i)]
             self._tableau_down.append(cards)
         self._tableau_up = []
         for i in six.moves.range(7):
-            self._tableau_up.append([self._detect_tableau_card(screen, i)])
+            self._tableau_up.append([self._detect_tableau_card(i)])
         self._foundation = [[], [], [], []]
         self._round = 0
 
@@ -119,9 +119,14 @@ class Solitaire(object):
         x = self._stock_x + self._card_width // 2
         y = self._stock_y + self._card_height // 2
         self._click(x, y)
-        time.sleep(0.8)
-        screen = self._screenshot()
-        draw_cards = self._detect_waste_cards(screen)
+        time.sleep(0.6)
+        if self._stock[-1][0] is not None:
+            for i in six.moves.range(self._draw_count):
+                if self._stock == []:
+                    break
+                self._waste.append(self._stock.pop())
+            return
+        draw_cards = self._detect_waste_cards()
         if self._waste != []:
             top_card = self._waste[-1]
             for i, card in enumerate(draw_cards):
@@ -136,7 +141,7 @@ class Solitaire(object):
         x = self._stock_x + self._card_width // 2
         y = self._stock_y + self._card_height // 2
         self._click(x, y)
-        time.sleep(0.7)
+        time.sleep(0.3)
         self._round += 1
         while self._waste != []:
             self._stock.append(self._waste.pop())
@@ -145,7 +150,6 @@ class Solitaire(object):
         x = self._waste_x + self._waste_offset + self._card_width // 2
         y = self._waste_y + self._card_height // 2
         self._click(x, y, button='right')
-        time.sleep(0.5)
         self._foundation[suit].append(self._waste.pop())
 
     def waste_to_tableau(self, index):
@@ -158,7 +162,6 @@ class Solitaire(object):
         else:
             y2 = self._detect_tableau_bottom(screen, index) - self._card_height // 2
         self._drag(x1, y1, x2, y2)
-        time.sleep(0.5)
         self._tableau_up[index].append(self._waste.pop())
 
     def tableau_to_foundation(self, index, suit):
@@ -166,7 +169,6 @@ class Solitaire(object):
         x = self._tableau_x + self._tableau_offset * index + self._card_width // 2
         y = self._detect_tableau_bottom(screen, index) - self._card_height // 2
         self._click(x, y, button='right')
-        time.sleep(0.5)
         self._foundation[suit].append(self._tableau_up[index].pop())
 
     def tableau_to_tableau(self, from_index, to_index, n):
@@ -185,7 +187,6 @@ class Solitaire(object):
         else:
             y2 = self._detect_tableau_bottom(screen, to_index) - self._card_height // 2
         self._drag(x1, y1, x2, y2)
-        time.sleep(0.5)
         self._tableau_up[to_index].extend(self._tableau_up[from_index][-n:])
         self._tableau_up[from_index] = self._tableau_up[from_index][:-n]
 
@@ -200,14 +201,12 @@ class Solitaire(object):
         else:
             y2 = self._detect_tableau_bottom(screen, index) - self._card_height // 2
         self._drag(x1, y1, x2, y2)
-        time.sleep(0.5)
         self._tableau_up[index].append(self._foundation[suit].pop())
 
     def flip(self, index):
-        time.sleep(0.5)
         screen = self._screenshot()
         self._tableau_down[index].pop()
-        self._tableau_up[index].append(self._detect_tableau_card(screen, index))
+        self._tableau_up[index].append(self._detect_tableau_card(index))
 
     def has_no_move(self):
         screen = self._screenshot()
@@ -217,7 +216,7 @@ class Solitaire(object):
 
     def accept_no_move(self):
         self._click(self._no_move_x, self._no_move_y)
-        time.sleep(2)
+        time.sleep(1)
         self._click(self._new_game_x, self._new_game_y)
         self._update_result()
         time.sleep(3)
@@ -231,13 +230,13 @@ class Solitaire(object):
 
     def solve(self):
         self._click(self._solve_x, self._solve_y)
-        time.sleep(10)
+        time.sleep((52 - sum([len(f) for f in self._foundation])) * 0.1)
         self.clear_game()
 
     def clear_game(self):
-        time.sleep(3)
+        time.sleep(5)
         self._click(self._new_game_after_clear_x, self._new_game_after_clear_y)
-        time.sleep(2)
+        time.sleep(3)
         self._click(self._new_game_after_clear_x, self._new_game_after_clear_y)
         self._update_result(clear=True)
         time.sleep(3)
@@ -299,27 +298,27 @@ class Solitaire(object):
         image = (image > 100).astype(np.int32)
         return image[:,:,0] * image[:,:,2]
 
-    def _waste_is_empty(self, screen):
-        return self._detect_waste_cards(screen) == []
+    def _waste_is_empty(self):
+        return self._detect_waste_cards() == []
 
-    def _detect_waste_cards(self, screen):
+    def _detect_waste_cards(self):
         result = []
         y = self._waste_y
         for i in six.moves.range(3):
             x = self._waste_x + self._waste_offset * i
             x = int(round(x))
-            card = self._detect_card(screen, x, y)
+            card = self._detect_card(x, y)
             if card[0] is None:
                 break
             result.append(card)
         return result
 
-    def _detect_tableau_card(self, screen, index):
+    def _detect_tableau_card(self, index):
         x = self._tableau_x + self._tableau_offset * index
         y = self._tableau_y + self._tableau_down_offset * len(self._tableau_down[index])
         x = int(round(x))
         y = int(round(y))
-        return self._detect_card(screen, x, y)
+        return self._detect_card(x, y)
 
     def _detect_tableau_bottom(self, screen, index):
         x = self._tableau_x + self._tableau_offset * index + self._card_width // 2
@@ -332,17 +331,18 @@ class Solitaire(object):
         return self._window_height - bottom
 
     def _detect_foundation_suit(self, suit):
-        screen = self._screenshot()
         y = self._foundation_y
         for i in six.moves.range(4):
             x = self._foundation_x + self._foundation_offset * i
             x = int(round(x))
-            card = self._detect_card(screen, x, y)
+            card = self._detect_card(x, y)
             if card[1] == suit:
                 return i
         return -1
 
-    def _detect_card(self, screen, x, y):
+    def _detect_card(self, x, y):
+        screen = self._screenshot()
+        card = (None, None)
         size = self._symbol_size
         digit = self._find_symbol(screen, self._digit_images, x, y + 2, size + 4, size + 4)
         suit = self._find_symbol(screen, self._suit_images, x, y + size + 2, size + 4, size + 4)

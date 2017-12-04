@@ -1,5 +1,6 @@
 import argparse
 import six
+import time
 import subprocess
 
 from solitaire import Solitaire
@@ -61,7 +62,6 @@ def main():
         print(' '.join(command))
         process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
         stdout_data, stderr_data = process.communicate()
-        popen = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
         print(stdout_data);
         results = stdout_data.split()
         moves = results[:-1]
@@ -110,6 +110,7 @@ def main():
             elif move[0] == 'S':
                 solitaire.foundation_to_tableau(3, int(move[1]) - 1)
             elif move[0] == 'F':
+                time.sleep(0.5)
                 solitaire.flip(int(move[1]) - 1)
             elif move[1] == 'C':
                 solitaire.tableau_to_foundation(int(move[0]) - 1, 0)
@@ -127,9 +128,11 @@ def main():
                 else:
                     n = int(move[3:])
                 solitaire.tableau_to_tableau(from_index, to_index, n)
+                time.sleep(0.1 * (n - 1))
             foundation_num = sum(len(f) for f in solitaire.cards['foundation'])
             if foundation_num == 52:
                 solitaire.clear_game()
+            time.sleep(0.1)
 
 
 if __name__ == '__main__':

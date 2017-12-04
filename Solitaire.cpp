@@ -460,7 +460,7 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 			moveValue[i].value = currentValue;
 		}
 
-		return currentValue == 52 ? SolvedMinimal : Impossible;
+		return (currentValue >> 16) == 52 ? SolvedMinimal : Impossible;
 	}
 
 	int openCount = 1;
@@ -500,7 +500,7 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 		while (movesMadeCount > firstMoveCount) {
 			UndoMove();
 		}
-		Move move = movesMade[0];
+		Move move = movesMade[firstMoveCount];
 		int i;
 		for (i = 0; i < moveValueCount; i++) {
 			if (moveValue[i].move == move) {
@@ -515,7 +515,6 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 		if (currentValue > moveValue[i].value) {
 			moveValue[i].value = currentValue;
 		}
-		currentValue = ((foundationCount + 1) << 16) - movesMadeCount - 1;
 
 		int movesTotal = 0;
 		node = firstNode;
@@ -527,6 +526,13 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 			MakeMove(movesToMake[--movesTotal]);
 		}
 		currentValue = ((foundationCount + 1) << 16) - movesMadeCount - 1;
+		if (piles[WASTE].Size() == 0 && piles[STOCK].UpSize() == 0) {
+			for (int i = TABLEAU1; i <= TABLEAU7; i++) {
+			}
+			if (i > TABLEAU7) {
+				currentValue = (53 << 16) - movesMadeCount - 1;
+			}
+		}
 
 		//Make any auto moves
 		UpdateAvailableMoves();
@@ -544,6 +550,13 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 
 		//Check for best solution to foundations
 		value = ((foundationCount + 1) << 16) - movesMadeCount - 1;
+		if (piles[WASTE].Size() == 0 && piles[STOCK].UpSize() == 0) {
+			for (int i = TABLEAU1; i <= TABLEAU7; i++) {
+			}
+			if (i > TABLEAU7) {
+				value = (53 << 16) - movesMadeCount - 1;
+			}
+		}
 		if (value > currentValue) {
 			currentValue = value;
 		}
@@ -595,7 +608,7 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 	while (movesMadeCount > 0) {
 		UndoMove();
 		if (movesMadeCount == firstMoveCount) {
-			Move move = movesMade[0];
+			Move move = movesMade[firstMoveCount];
 			int i;
 			for (i = 0; i < moveValueCount; i++) {
 				if (moveValue[i].move == move) {
@@ -604,13 +617,12 @@ SolveResult Solitaire::SolveMinimal(int maxClosedCount) {
 			}
 			if (i >= moveValueCount) {
 				moveValue[i].move = move;
-				moveValue[i].value = 0;
+				moveValue[i].value = currentValue;
 				moveValueCount++;
 			}
 			if (currentValue > moveValue[i].value) {
 				moveValue[i].value = currentValue;
 			}
-			currentValue = ((foundationCount + 1) << 16) - movesMadeCount - 1;
 		}
 	}
 	for (int i = 0; bestSolution[i].Count < 255; i++) {

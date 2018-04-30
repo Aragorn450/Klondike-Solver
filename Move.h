@@ -1,22 +1,24 @@
 #ifndef Move_h
 #define Move_h
-#include<memory>
+#include <memory>
 using namespace std;
 
 struct Move {
-	unsigned char From, To, Count, Extra;
+  unsigned char From, To, Count, Extra;
 
-	Move();
-	Move(unsigned char from, unsigned char to, unsigned char count, unsigned char extra);
-	void Set(unsigned char from, unsigned char to, unsigned char count, unsigned char extra);
-	bool operator==(const Move& move);
+  Move();
+  Move(unsigned char from, unsigned char to, unsigned char count,
+       unsigned char extra);
+  void Set(unsigned char from, unsigned char to, unsigned char count,
+           unsigned char extra);
+  bool operator==(const Move &move);
 };
 
 struct MoveNode {
-	shared_ptr<MoveNode> Parent;
-	Move Value;
+  shared_ptr<MoveNode> Parent;
+  Move Value;
 
-	MoveNode(Move move);
-	MoveNode(Move move, shared_ptr<MoveNode> const& parent);
+  MoveNode(Move move);
+  MoveNode(Move move, shared_ptr<MoveNode> const &parent);
 };
 #endif

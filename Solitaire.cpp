@@ -8,7 +8,7 @@ using namespace std;
 
 const char PILES[] = {"W1234567GCDHS"};
 const char RANKS[] = {"0A23456789TJQK"};
-const char SUITS[] = {"CDHS"};
+const char SUITS[] = {"HSDC"};
 
 SolitaireWorker::SolitaireWorker(Solitaire &solitaire, int maxClosedCount) {
   this->solitaire = &solitaire;
@@ -1422,7 +1422,7 @@ bool Solitaire::LoadSolitaire(string const &cardSet) {
     }
     for (int i = 0; i < 52; i++) {
       int suit = (cardSet.at(i * 3 + 2) - 48) - 1;
-      if (suit < CLUBS || suit > SPADES) {
+      if (suit < HEARTS || suit > CLUBS) {
         return false;
       }
 
@@ -1440,53 +1440,14 @@ bool Solitaire::LoadSolitaire(string const &cardSet) {
     }
   } else {
     for (int i = 0; i < 52; i++) {
-      int suit;
-      switch (toupper(cardSet.at(i * 2 + 1))) {
-        case 'C':
-          suit = 0;
-          break;
-        case 'D':
-          suit = 1;
-          break;
-        case 'H':
-          suit = 2;
-          break;
-        case 'S':
-          suit = 3;
-          break;
-        default:
-          return false;
+      int suit = cards[i].GetSuit(cardSet.at(i * 2 + 1));
+      if (suit == NONE) {
+        return false;
       }
 
-      int rank;
-      switch (toupper(cardSet.at(i * 2))) {
-        case 'A':
-          rank = 1;
-          break;
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-          rank = cardSet.at(i * 2) - 48;
-          break;
-        case 'T':
-          rank = 10;
-          break;
-        case 'J':
-          rank = 11;
-          break;
-        case 'Q':
-          rank = 12;
-          break;
-        case 'K':
-          rank = 13;
-          break;
-        default:
-          return false;
+      int rank = cards[i].GetRank(cardSet.at(i * 2));
+      if (rank == 0) {
+        return false;
       }
 
       int value = suit * 13 + rank - 1;
@@ -1547,7 +1508,7 @@ bool Solitaire::LoadPysol(string const &cardSet) {
             ? CLUBS
             : (cardSet[j] == 'D' ? DIAMONDS
                                  : (cardSet[j] == 'S' ? SPADES : HEARTS));
-    if (suit < CLUBS || suit > HEARTS) {
+    if (suit < HEARTS || suit > CLUBS) {
       return false;
     }
     j += 2;
@@ -1593,7 +1554,7 @@ bool Solitaire::LoadPysol(string const &cardSet) {
             ? CLUBS
             : (cardSet[j] == 'D' ? DIAMONDS
                                  : (cardSet[j] == 'S' ? SPADES : HEARTS));
-    if (suit < CLUBS || suit > HEARTS) {
+    if (suit < HEARTS || suit > CLUBS) {
       return false;
     }
     j += 3;
@@ -1810,10 +1771,10 @@ string Solitaire::GameDiagram() {
 }
 string Solitaire::GameDiagramPysol() {
   stringstream ss;
-  ss << "Foundations: H-" << RANKS[piles[FOUNDATION4H].Size()] << " C-"
-     << RANKS[piles[FOUNDATION1C].Size()] << " D-"
-     << RANKS[piles[FOUNDATION2D].Size()] << " S-"
-     << RANKS[piles[FOUNDATION3S].Size()];
+  ss << "Foundations: H-" << RANKS[piles[FOUNDATION4H].Size()] << " S-"
+     << RANKS[piles[FOUNDATION3S].Size()] << " D-"
+     << RANKS[piles[FOUNDATION2D].Size()] << " C-"
+     << RANKS[piles[FOUNDATION1C].Size()];
   ss << "\nTalon: ";
 
   Pile &waste = piles[WASTE];

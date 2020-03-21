@@ -30,8 +30,8 @@ KlondikeSolver [/DC #] [/M #] [/O #] [/MVS] [/S #] [/RC #] [/R] [/F] [/D] [/G] [
 NOTES:
 
 The Deck format is in the order a deck of cards is dealt to the board. Each card is represented by a 3 digit long numerical character. The first two digits are the value of the card:
-01 for an ace, 02 for a 2, 11 for a jack, 13 for a king. The third digit represents the suit. 1 for clubs, 2 for diamonds, 3 for hearts, 4 for spades.
-Therefore an Ace of spaces is 014. A 4 of diamonds is represented by 042.
+01 for an ace, 02 for a 2, 11 for a jack, 13 for a king. The third digit represents the suit. 1 for hearts, 2 for spades, 3 for diamonds, 4 for clubs.
+Therefore an Ace of spaces is 012. A 4 of diamonds is represented by 043.
 
 When using the /MOVES command, the program will produce the moves neccesary such that you could execute the winning condition. The codex for moves is as follows:
 	DR# is a draw move that is done # number of times. ie) DR2 means draw twice, if draw count is greater than 1 (3 for instance) it is still DR2, but in the case of a draw count of 3, you would flip 6 cards.

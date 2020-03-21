@@ -72,7 +72,8 @@ bool parseCards(string const &cardSet, int values[], int sizes[]) {
       p++;
     }
     int suit = (cardSet[p + 2] ^ 0x30) - 1;
-    if (suit >= CLUBS && suit <= HEARTS) {
+    if (suit >= HEARTS && suit <= CLUBS) {
+      printf("parseCards - suit = %c\n", suit);
       if (suit >= SPADES) {
         suit = (suit == SPADES) ? HEARTS : SPADES;
       }

@@ -1,0 +1,23 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+  ],
+  "settings": {
+    "files.associations": {
+      "deque": "cpp",
+      "initializer_list": "cpp",
+      "list": "cpp",
+      "vector": "cpp",
+      "xhash": "cpp",
+      "xstring": "cpp",
+      "xutility": "cpp",
+      "system_error": "cpp",
+      "xfunctional": "cpp",
+      "xlocmon": "cpp",
+      "xtr1common": "cpp",
+      "type_traits": "cpp"
+    }
+  }
+}

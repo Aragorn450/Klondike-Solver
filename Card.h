@@ -17,11 +17,13 @@ enum Cards {
   KING
 };
 
-enum Suits { CLUBS = 0, DIAMONDS, HEARTS, SPADES, NONE = 255 };
+enum Suits { HEARTS = 0, SPADES, DIAMONDS, CLUBS, NONE = 255 };
 
 struct Card {
   unsigned char Suit, Rank, IsOdd, IsRed, Foundation, Value;
   void Clear();
   void Set(unsigned char value);
+  unsigned char GetSuit(unsigned char suit);
+  unsigned char GetRank(unsigned char suit);
 };
 #endif
